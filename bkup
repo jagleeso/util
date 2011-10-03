@@ -1,0 +1,55 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use v5.10;
+
+use File::Copy qw(mv);
+use File::Basename qw(basename);
+use Getopt::Long;
+
+main() unless caller;
+
+sub main {
+    my $recover = 0;
+    GetOptions(
+        'recover|r!' => \$recover,
+    );
+    checkfiles(@ARGV);
+    if ($recover) {
+        foreach my $file (@ARGV) {
+            recover($file);
+        }
+    } else {
+        foreach my $file (@ARGV) {
+            bkup($file);
+        }
+    }
+}
+
+sub err {
+    my ($msg) = @_;
+    say STDERR $msg;
+    exit 1;
+}
+
+sub checkfiles {
+    foreach my $file (@_) {
+        -e $file or err("No such file or directory: $file");
+        -w $file or err("File is not writable: $file");
+    }
+}
+
+sub bkup {
+    my ($file) = @_;
+    my $newfile = $file;
+    $newfile =~ s/\/$//;
+    $newfile = "$newfile.bkup";
+    mv $file, $newfile;
+}
+
+sub recover {
+    my ($file) = @_;
+    my $newfile = $file;
+    $newfile =~ s/.bkup\/?$//;
+    mv $file, $newfile;
+}
