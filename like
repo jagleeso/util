@@ -1,0 +1,64 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Getopt::Long;
+
+main() unless caller;
+
+sub main {
+    my $directory = ''; # find defaults to the cwd
+    my $sensitive = 0;
+    my $help = 0;
+    GetOptions(
+        'd|directory=s' => \$directory,
+        's|sensitive!'  => \$sensitive,
+        'h|help!'       => \$help,
+    );
+    my $usage = sub {
+        print <<EOF
+USAGE:
+    like [-d|--directory path/to/dir]
+         [-s|--sensitive]
+         pattern [pattern ...]
+
+DESCRIPTION:
+    Use the unix find command, substituting supplied patterns with *pattern*.
+
+EXAMPLE:
+    \$ like look ma
+    This will invoke find as:
+    \$ find -iname '*look*' -o '*ma*' 
+
+OPTIONS:
+    --directory, -d
+        Search recursively starting at this directory
+        default: $directory
+
+    --sensitive, -s
+        Make the search case sensitive
+        default: case insensitive 
+EOF
+    };
+    my $err = sub {
+        my ($msg) = @_;
+        print STDERR "$msg\n" if $msg;
+        $usage->();
+        exit 1;
+    };
+    not $help
+        or $usage->() and exit; 
+    $directory eq '' or -d $directory 
+        or $err->("No such directory $directory");
+    @ARGV > 0 
+        or $err->("Provide at least one pattern");
+    my @patterns = @ARGV;
+    
+    system 'find ' . findargs($directory, $sensitive, @patterns);
+}
+
+sub findargs {
+    my ($directory, $sensitive, @patterns) = @_;
+    my $name = $sensitive ? 'name' : 'iname';
+    my @name_patterns = map { "-$name '*$_*'" } @patterns;   
+    "$directory " . join ' -o ', @name_patterns;
+}
