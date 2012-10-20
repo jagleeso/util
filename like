@@ -3,23 +3,68 @@ use strict;
 use warnings;
 use Getopt::Long;
 
-main() unless caller;
+my $FIND = 'find';
+
+my %TYPE_REGEX = ( 
+    'python'  => 'py',
+    'perl'    => 'pl',
+    'ruby'    => 'rb',
+    'haskell' => 'rb',
+);
+
+sub file_type_regex {
+    my ($type) = @_; 
+    defined $type or return undef;
+    my $suffix = $TYPE_REGEX{$type} // $type;
+    return ( '.*[^\.]*.\(' . $suffix . '\)$' );
+}
+
+sub spaceout(@) {
+    join ' ', @_;
+}
+
+sub conjunctify($@) { 
+    my $junction = '-' . shift;
+    @_ = grep { defined $_ and $_ ne '' } @_;
+    if (@_ > 0) {
+        '\( ' . (join " $junction ", @_) . ' \)';
+    } else { 
+        ();
+    }
+}
+
+sub findargs {
+    my ($directory, $sensitive, $type, @patterns) = @_;
+    my $name = $sensitive ? 'name' : 'iname';
+    my @name_patterns = map { "-$name '*$_*'" } @patterns;   
+    my $type_pattern = file_type_regex($type);
+    my $type_args = (defined $type_pattern) ? 
+        "-iregex '$type_pattern'" :
+        '';
+    spaceout $directory, conjunctify('and', $type_args, conjunctify('or', @name_patterns));
+}
 
 sub main {
     my $directory = ''; # find defaults to the cwd
     my $sensitive = 0;
     my $help = 0;
+    my $type;
+    my $verbose = 0;
     GetOptions(
         'd|directory=s' => \$directory,
         's|sensitive!'  => \$sensitive,
+        't|type=s'      => \$type,
         'h|help!'       => \$help,
+        'v|verbose!'    => \$verbose,
     );
     my $usage = sub {
         print <<EOF
 USAGE:
-    like [-d|--directory path/to/dir]
+    like pattern [pattern ...]
+         [-d|--directory path/to/dir]
          [-s|--sensitive]
-         pattern [pattern ...]
+         [-t|--type]
+         [-v|--verbose]
 
 DESCRIPTION:
     Use the unix find command, substituting supplied patterns with *pattern*.
@@ -37,6 +82,16 @@ OPTIONS:
     --sensitive, -s
         Make the search case sensitive
         default: case insensitive 
+
+    --type, -t
+        Only search for files of this type.  The following types are predefined and 
+        correspond to regex matches on filename suffices:
+
+@{[ join '', map { "        " . "$_ = " . $TYPE_REGEX{$_} . "\n" } keys %TYPE_REGEX ]}
+        If type used is not defined, the regex used is /*.(\$type)/
+
+    --verbose, -v
+        If set, print the call to find to stderr
 EOF
     };
     my $err = sub {
@@ -49,16 +104,17 @@ EOF
         or $usage->() and exit; 
     $directory eq '' or -d $directory 
         or $err->("No such directory $directory");
-    @ARGV > 0 
+    @ARGV > 0 or defined $type
         or $err->("Provide at least one pattern");
     my @patterns = @ARGV;
+
+    my $do = sub {
+        my ($cmd) = @_;
+        print STDERR "$cmd\n" if $verbose;
+        system $cmd;
+    };
     
-    system 'find ' . findargs($directory, $sensitive, @patterns);
+    $do->("$FIND " . findargs($directory, $sensitive, $type, @patterns));
 }
 
-sub findargs {
-    my ($directory, $sensitive, @patterns) = @_;
-    my $name = $sensitive ? 'name' : 'iname';
-    my @name_patterns = map { "-$name '*$_*'" } @patterns;   
-    "$directory " . join ' -o ', @name_patterns;
-}
+main() unless caller;
