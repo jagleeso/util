@@ -9,7 +9,7 @@ my %TYPE_REGEX = (
     'python'  => 'py',
     'perl'    => 'pl',
     'ruby'    => 'rb',
-    'haskell' => 'rb',
+    'haskell' => 'hs',
 );
 
 sub file_type_regex {
