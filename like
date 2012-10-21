@@ -2,6 +2,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use File::Basename;
 
 my $FIND = 'find';
 
@@ -96,16 +97,18 @@ EOF
     };
     my $err = sub {
         my ($msg) = @_;
-        print STDERR "$msg\n" if $msg;
         $usage->();
+        if ($msg) {
+            print STDERR "\n", basename($0) . ": $msg\n";
+        }
         exit 1;
     };
     not $help
         or $usage->() and exit; 
     $directory eq '' or -d $directory 
-        or $err->("No such directory $directory");
+        or $err->("no such directory $directory");
     @ARGV > 0 or defined $type
-        or $err->("Provide at least one pattern");
+        or $err->("provide at least one pattern");
     my @patterns = @ARGV;
 
     my $do = sub {

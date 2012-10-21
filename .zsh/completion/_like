@@ -1,0 +1,14 @@
+#compdef like 
+
+_like() {
+
+  _arguments \
+    '(--directory -d)'{--directory,-d}'[Search recursively starting at this directory]: :_directories' \
+    '(--sensitive -s)'{--sensitive,-s}'[Make the search case sensitive]' \
+    '(--type -t)'{--type,-t}'[Only search for files of this type]' \
+    '(--verbose -v)'{--verbose,-v}'[If set print the call to find to stderr]' \
+    && return 0
+
+}
+
+_like "$@"
