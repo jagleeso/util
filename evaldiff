@@ -1,0 +1,67 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use autodie;
+use Getopt::Long qw(GetOptions);
+use File::Temp qw(tempfile);
+use Capture::Tiny qw(capture_merged);
+
+sub evaltmp($$) {
+    my ($cmd, $template) = @_;
+    my ($file, $name) = tempfile($template, SUFFIX => 'txt');
+    print $file scalar capture_merged { system $cmd };
+    close $file;
+    return $name;
+}
+
+sub main {
+    my $cleanup = 1;
+    my $help = 0;
+    my $diff = 
+        (not defined $ENV{EDITOR}) ?
+            'diff' :
+        ($ENV{EDITOR} eq 'vim') ?
+            'vimdiff' :
+            'diff';
+    GetOptions(
+        "d|diff=s"   => \$diff,
+        "c|cleanup!" => \$cleanup,
+        "h|help!"    => \$help,
+    );
+    my $usage = sub {
+        print <<EOF
+USAGE: evaldiff "<cmd1>" "<cmd2>"
+                [-d|--diff external-diff-program]
+                [-c|--cleanup]
+
+OPTIONS:
+    -d, --diff
+    External diff program which takes 2 filenames as arguments (files containing the output of cmd1 
+    and cmd2).  If your \$EDITOR is vim, defaults to vimdiff (otherwise diff).
+    default: $diff
+
+    -c, --cleanup, --nocleanup
+    If on, delete the files containing output of cmd1 and cmd2 after the external diff program 
+    terminates.
+    default: on
+
+EOF
+    };
+    my $err = sub {
+        my ($msg) = @_;
+        $usage->();
+        print STDERR "evaldiff: $msg" if defined $msg;
+        exit 1;
+    };
+    $help
+        and ( $usage->(), exit 0 );
+    @ARGV == 2
+        or $err->("only 2 arguments allowed (command1, and command2)");
+    my ($cmd1, $cmd2) = @ARGV;
+	sub template($) { "cmd$_[0]XXXX" };
+    my ($name1, $name2) = (evaltmp($cmd1, template 1), evaltmp($cmd2, template 2));
+	system "$diff '$name1' '$name2'";
+    unlink $name1, $name2 if $cleanup;
+}
+
+main() unless caller;
