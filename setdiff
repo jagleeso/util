@@ -1,0 +1,77 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+
+use Getopt::Long qw(GetOptions);
+use autodie;
+
+sub main() {
+    my $help = 0;
+    GetOptions(
+        'h|help!' => \$help,
+    );
+    sub stdin_or_open($) {
+        my ($name) = @_;
+        return *STDIN if $name eq '-';
+        open my $f, '<', $name; 
+        return $f;
+    }
+    my %set_cmd = (
+        'diff' => *diff,
+        'int' => *intersect,
+        'union' => *union,
+    );
+    my $usage = sub {
+        print <<EOF
+USAGE: setdiff (${\ join '|', keys %set_cmd}) FILE1 FILE2
+
+DESCRIPTION:
+    Perform set operations on all lines in two files.  If a filename is '-', use standard input.
+
+EOF
+    };
+    $help
+        and $usage->() and exit 1;
+    @ARGV == 3
+        or die "Expect setdiff command (${\ join ', ', keys %set_cmd }) and 2 files\n";
+    my ($cmd, $f1, $f2) = ($ARGV[0], stdin_or_open $ARGV[1], stdin_or_open $ARGV[2]);
+    defined $set_cmd{$cmd}
+        or die "Unknown setdiff command $cmd; try one of these: ${\ join ', ', keys %set_cmd }\n";
+    for (&{$set_cmd{$cmd}}($f1, $f2)) {
+        print;
+    }
+}
+
+sub hash_handle($) {
+    my ($f) = @_;
+    my %h = map { $_ => 1 } <$f>;
+}
+
+sub diff($$) {
+    my ($f1, $f2) = @_;
+    my %h1 = hash_handle $f1;
+    my %h2 = hash_handle $f2;
+    grep { not defined $h2{$_} } keys %h1;
+}
+
+sub union($$) {
+    my ($f1, $f2) = @_;
+    my %h;
+    while (<$f1>) { $h{$_} = 1 }
+    while (<$f2>) { $h{$_} = 1 }
+    keys %h;
+}
+
+sub intersect($$) {
+    my ($f1, $f2) = @_;
+    my %h = hash_handle $f1;
+    my @int;
+    while(<$f2>) {
+        if (defined $h{$_}) {
+            push @int, $_;
+        }
+    }
+    @int;
+}
+
+main unless caller;
